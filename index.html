@@ -14,6 +14,7 @@
         .hidden { display: none; }
         .transaction-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -27,6 +28,7 @@
     </div>
 
     <div id="app-screen" class="hidden">
+
         <div class="card" style="text-align: center;">
             <h1 id="total-spent">₹0.00</h1>
             <p style="margin:0; color: gray;">Spent in last 90 days</p>
@@ -47,6 +49,11 @@
             <div id="transaction-list"></div>
         </div>
         
+        <div class="card">
+            <h3>Spending Analytics</h3>
+            <canvas id="analytics-chart" width="400" height="400"></canvas>
+        </div>
+
         <button onclick="logout()" style="background-color: #FF3B30;">Log Out</button>
     </div>
 </div>
@@ -54,7 +61,16 @@
 <script>
     // --- SETTINGS ---
     // Change this to your Render URL! (No trailing slash)
-    const API_BASE_URL = "https://flo-api.onrender.com"; 
+    let API_BASE_URL;
+    
+    // "Am I currently opened on a laptop's local hard drive?"
+    if (window.location.hostname === "localhost" || window.location.protocol === "file:") {
+        // YES: Connect to the Sandbox (Local uvicorn server)
+        API_BASE_URL = "http://localhost:8000"; 
+    } else {
+        // NO: I must be live on the internet! Connect to the Live Stage (Render)
+        API_BASE_URL = "https://flo-api.onrender.com"; 
+    }
     
     // --- APP LOGIC ---
     // Check if we are already logged in when the app opens
