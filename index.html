@@ -110,6 +110,7 @@
         fetchCategories();
         fetchAnalytics();
         fetchTransactions();
+        fetchChartData();
     }
 
     async function fetchAnalytics() {
@@ -145,6 +146,55 @@
         }
     }
 
+    // Global variable to hold our chart instance
+    let spendingChart;
+
+    async function fetchChartData() {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE_URL}/analytics/summary`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+            const rawData = await response.json();
+
+            // 1. Transform the raw JSON into two flat arrays for Chart.js
+            const chartLabels = rawData.map(item => item.category_name);
+            const chartValues = rawData.map(item => item.total_spent);
+
+            // 2. Grab the blank canvas
+            const ctx = document.getElementById("analytics-chart").getContext("2d");
+
+            // 3. Destroy the old chart if it exists (so they don't overlap)
+            if (spendingChart) {
+                spendingChart.destroy();
+            }
+
+            // 4. Draw the new Doughnut Chart!
+            spendingChart = new Chart(ctx, {
+                type: 'doughnut', 
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: 'Total Spent (₹)',
+                        data: chartValues,
+                        // Adding some nice default colors
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' } // Puts the labels below the circle
+                    }
+                }
+            });
+        }
+    }
+
     async function addTransaction() {
         const token = localStorage.getItem("token");
         const amount = document.getElementById("amount").value;
@@ -173,6 +223,7 @@
             document.getElementById("desc").value = "";
             fetchAnalytics(); // Refresh the dashboard
             fetchTransactions(); // Refresh the list
+            fetchChartData();
         } else {
             alert("Failed to save transaction.");
         }
