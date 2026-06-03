@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flo Tracker</title>
+    <style>
+        :root { --primary: #007AFF; --bg: #F2F2F7; --card: #FFFFFF; --text: #1C1C1E; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 400px; margin: 0 auto; }
+        .card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
+        button { background-color: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
+        .hidden { display: none; }
+        .transaction-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="login-screen" class="card">
+        <h2>Welcome to Flo</h2>
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Log In</button>
+        <p style="font-size: 12px; text-align: center; color: gray;">(Ensure your backend is running!)</p>
+    </div>
+
+    <div id="app-screen" class="hidden">
+        <div class="card" style="text-align: center;">
+            <h1 id="total-spent">₹0.00</h1>
+            <p style="margin:0; color: gray;">Spent in last 90 days</p>
+        </div>
+
+        <div class="card">
+            <h3>Add Expense</h3>
+            <input type="number" id="amount" placeholder="Amount (₹)">
+            <input type="text" id="desc" placeholder="What did you buy?">
+            <select id="category-select">
+                <option value="">Loading categories...</option>
+            </select>
+            <button onclick="addTransaction()">Save Expense</button>
+        </div>
+
+        <div class="card">
+            <h3>Recent Transactions</h3>
+            <div id="transaction-list"></div>
+        </div>
+        
+        <button onclick="logout()" style="background-color: #FF3B30;">Log Out</button>
+    </div>
+</div>
+
+<script>
+    // --- SETTINGS ---
+    // Change this to your Render URL! (No trailing slash)
+    const API_BASE_URL = "https://flo-api.onrender.com"; 
+    
+    // --- APP LOGIC ---
+    // Check if we are already logged in when the app opens
+    window.onload = () => {
+        if (localStorage.getItem("token")) {
+            showApp();
+        }
+    };
+
+    async function login() {
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+
+        // OAuth2 requires form data, not JSON!
+        const formData = new URLSearchParams();
+        formData.append("username", email);
+        formData.append("password", password);
+
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: formData
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem("token", data.access_token); // Save the wristband!
+            showApp();
+        } else {
+            alert("Login failed! Check credentials.");
+        }
+    }
+
+    function showApp() {
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("app-screen").classList.remove("hidden");
+        fetchCategories();
+        fetchAnalytics();
+        fetchTransactions();
+    }
+
+    async function fetchAnalytics() {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE_URL}/analytics/rolling-average`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        }); 
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById("total-spent").innerText = `₹${data.total_spent_in_window.toFixed(2)}`;
+        }
+    }
+
+    async function fetchTransactions() {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE_URL}/transactions/`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const transactions = await response.json();
+            const list = document.getElementById("transaction-list");
+            list.innerHTML = ""; // Clear old list
+            
+            transactions.forEach(t => {
+                list.innerHTML += `
+                    <div class="transaction-item">
+                        <span>${t.description}</span>
+                        <span style="font-weight: bold;">₹${t.amount}</span>
+                    </div>
+                `;
+            });
+        }
+    }
+
+    async function addTransaction() {
+        const token = localStorage.getItem("token");
+        const amount = document.getElementById("amount").value;
+        const desc = document.getElementById("desc").value;
+        const categoryId = document.getElementById("category-select").value;
+        
+        const payload = {
+            amount: parseFloat(amount),
+            type: "Expense",
+            description: desc,
+            transaction_date: new Date().toISOString().split('T')[0],
+            category_id: 1 // We will build a category dropdown later!
+        };
+
+        const response = await fetch(`${API_BASE_URL}/transactions/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            document.getElementById("amount").value = "";
+            document.getElementById("desc").value = "";
+            fetchAnalytics(); // Refresh the dashboard
+            fetchTransactions(); // Refresh the list
+        } else {
+            alert("Failed to save transaction.");
+        }
+    }
+
+    async function fetchCategories() {
+        const token = localStorage.getItem("token");
+        // Remember we kept the prefix, so the URL is /transactions/categories
+        const response = await fetch(`${API_BASE_URL}/transactions/categories`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const categories = await response.json();
+            const select = document.getElementById("category-select");
+            select.innerHTML = ""; // Clear the "Loading categories..." text
+            
+            categories.forEach(cat => {
+                // For each category, create an option with its ID as the value and Name as the text
+                select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+            });
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem("token");
+        document.getElementById("login-screen").classList.remove("hidden");
+        document.getElementById("app-screen").classList.add("hidden");
+    }
+</script>
+</body>
+</html>
