@@ -217,7 +217,7 @@
             type: "Expense",
             description: desc,
             transaction_date: new Date().toISOString().split('T')[0],
-            category_id: 1 // We will build a category dropdown later!
+            category_id: parseInt(categoryId)
         };
 
         const response = await fetch(`${API_BASE_URL}/transactions/`, {
