@@ -39,7 +39,7 @@
             <input type="number" id="amount" placeholder="Amount (₹)">
             <input type="text" id="desc" placeholder="What did you buy?">
             <select id="category-select">
-                <option value="">Loading categories...</option>
+                <option value="">Connecting to cloud server...</option>
             </select>
             <button onclick="addTransaction()">Save Expense</button>
         </div>
@@ -245,6 +245,10 @@
                 // For each category, create an option with its ID as the value and Name as the text
                 select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
             });
+        } else {
+            // IF THE SERVER IS SLEEPING OR LAGGY:
+            const select = document.getElementById("category-select");
+            select.innerHTML = `<option value="">Waking up server (takes ~50s)...</option>`;
         }
     }
 
