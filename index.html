@@ -130,19 +130,30 @@
             headers: { "Authorization": `Bearer ${token}` }
         });
         
+        const list = document.getElementById("transaction-list");
+
         if (response.ok) {
             const transactions = await response.json();
-            const list = document.getElementById("transaction-list");
-            list.innerHTML = ""; // Clear old list
+            list.innerHTML = ""; 
             
-            transactions.forEach(t => {
+            // If the database is completely empty
+            if (transactions.length === 0) {
+                list.innerHTML = "<li style='padding: 10px; color: gray; text-align: center;'>No transactions yet. Start spending!</li>";
+                return;
+            }
+
+            // FEATURE: .slice(0, 5) grabs only the first 5 items from the array
+            transactions.slice(0, 5).forEach(t => {
                 list.innerHTML += `
-                    <div class="transaction-item">
-                        <span>${t.description}</span>
+                    <li style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee;">
+                        <span>${t.description} <small style="color: gray; display: block; font-size: 12px;">${t.category_name || ''}</small></span>
                         <span style="font-weight: bold;">₹${t.amount}</span>
-                    </div>
+                    </li>
                 `;
             });
+        } else {
+            // BUG FIX: The Honest UI fallback if the server hiccups
+            list.innerHTML = "<li style='padding: 10px; color: gray; text-align: center;'>Loading recent transactions...</li>";
         }
     }
 
