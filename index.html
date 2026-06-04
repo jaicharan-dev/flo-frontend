@@ -143,7 +143,7 @@
             }
 
             // FEATURE: .slice(0, 5) grabs only the first 5 items from the array
-            transactions.slice(0, 5).forEach(t => {
+            transactions.reverse().slice(0, 5).forEach(t => {
                 list.innerHTML += `
                     <li style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee;">
                         <span>${t.description} <small style="color: gray; display: block; font-size: 12px;">${t.category_name || ''}</small></span>
