@@ -97,7 +97,8 @@
 
         if (response.ok) {
             const data = await response.json();
-            localStorage.setItem("token", data.access_token); // Save the wristband!
+            localStorage.setItem("token", data.access_token); // Save the Visitor Badge
+            localStorage.setItem("refresh_token", data.refresh_token); // Save the Vault Key
             showApp();
         } else {
             alert("Login failed! Check credentials.");
@@ -125,10 +126,31 @@
     }
 
     async function fetchTransactions() {
-        const token = localStorage.getItem("token");
-        const response = await fetch(`${API_BASE_URL}/transactions/`, {
+        let token = localStorage.getItem("token"); // Use 'let' so we can update it!
+        let response = await fetch(`${API_BASE_URL}/transactions/`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
+        
+        // --- THE UPGRADED SECURITY TRAP ---
+        if (response.status === 401) {
+            console.log("Visitor badge expired. Trying Vault Key...");
+            const refreshSuccess = await refreshAccessToken();
+            
+            if (refreshSuccess) {
+                // It worked! We got a new badge. Grab it and retry the exact same fetch.
+                token = localStorage.getItem("token"); 
+                response = await fetch(`${API_BASE_URL}/transactions/`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+            } else {
+                // The Vault Key is dead too, or missing. Hard logout.
+                localStorage.removeItem("token");
+                localStorage.removeItem("refresh_token"); // Clear both keys!
+                alert("Your secure session has expired. Please log in again.");
+                window.location.reload();
+                return;
+            }
+        }
         
         const list = document.getElementById("transaction-list");
 
@@ -267,6 +289,37 @@
         localStorage.removeItem("token");
         document.getElementById("login-screen").classList.remove("hidden");
         document.getElementById("app-screen").classList.add("hidden");
+    }
+
+    async function refreshAccessToken() {
+        const refreshToken = localStorage.getItem("refresh_token");
+        
+        // If we don't even have a vault key, there is nothing to refresh
+        if (!refreshToken) {
+            return false; 
+        }
+
+        try {
+            // Run to the backend Security Desk
+            const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ refresh_token: refreshToken })
+            });
+
+            if (response.ok) {
+                // Success! We got a brand new 30-minute badge. Save it over the old dead one.
+                const data = await response.json();
+                localStorage.setItem("token", data.access_token);
+                return true; // Tell the app "We fixed it!"
+            } else {
+                // The Vault Key was fake or expired. 
+                return false; 
+            }
+        } catch (error) {
+            console.error("Failed to refresh token:", error);
+            return false;
+        }
     }
 </script>
 </body>
