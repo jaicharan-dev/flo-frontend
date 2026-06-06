@@ -109,7 +109,7 @@
         <div id="history" class="tab-content">
             <div class="card">
                 <h3>Full History</h3>
-                <p style="color: gray;">History feature coming soon...</p>
+                <div id="history-list"></div>
             </div>
         </div>
 
@@ -244,6 +244,56 @@
         }
     }
 
+    async function fetchHistory() {
+        let token = localStorage.getItem("token");
+        
+        // 1. The URL now specifically asks the backend dial for 50 items
+        let response = await fetch(`${API_BASE_URL}/transactions/?limit=50`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        
+        // 2. The same silent security trap we built earlier!
+        if (response.status === 401) {
+            const refreshSuccess = await refreshAccessToken();
+            if (refreshSuccess) {
+                token = localStorage.getItem("token"); 
+                response = await fetch(`${API_BASE_URL}/transactions/?limit=50`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+            } else {
+                localStorage.removeItem("token");
+                localStorage.removeItem("refresh_token");
+                alert("Your secure session has expired. Please log in again.");
+                window.location.reload();
+                return;
+            }
+        }
+
+        const list = document.getElementById("history-list");
+
+        if (response.ok) {
+            const transactions = await response.json();
+            list.innerHTML = ""; 
+            
+            if (transactions.length === 0) {
+                list.innerHTML = "<p style='color: gray; text-align: center;'>No history found.</p>";
+                return;
+            }
+
+            // Loop through all 50 items and display them
+            transactions.forEach(t => {
+                list.innerHTML += `
+                    <div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee;">
+                        <span>${t.description} <small style="color: gray; display: block; font-size: 12px;">${t.category_name || ''}</small></span>
+                        <span style="font-weight: bold;">₹${t.amount}</span>
+                    </div>
+                `;
+            });
+        } else {
+            list.innerHTML = "<p style='color: red; text-align: center;'>Failed to load history.</p>";
+        }
+    }
+
     // Global variable to hold our chart instance
     let spendingChart;
 
@@ -375,7 +425,14 @@
         if (clickedBtn) {
             clickedBtn.classList.add('active');
         }
+
+        // --- NEW AUTO-LOAD TRIGGER ---
+        if (tabId === 'history') {
+            document.getElementById("history-list").innerHTML = "<p style='color: gray; text-align: center;'>Loading history...</p>";
+            fetchHistory();
+        }
     }
+
 
     async function refreshAccessToken() {
         const refreshToken = localStorage.getItem("refresh_token");
