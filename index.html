@@ -84,10 +84,22 @@
                 <h3>Add Expense</h3>
                 <input type="number" id="amount" placeholder="Amount (₹)">
                 <input type="text" id="desc" placeholder="What did you buy?">
-                <select id="category-select">
-                    <option value="">Connecting to cloud server...</option>
+                
+                <select id="category-select" onchange="handleCategoryChange(this)">
+                    <option value="">Select a category...</option>
                 </select>
-                <button onclick="addTransaction()">Save Expense</button>
+
+                <div id="inline-category-form" style="display: none; margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px dashed #ccc;">
+                    <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #333;">Create Category</h4>
+                    <input type="text" id="new-cat-name" placeholder="Category Name (e.g. Subscriptions)">
+                    <input type="text" id="new-cat-keywords" placeholder="Keywords (optional)">
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button onclick="addCategory()" style="background-color: #28a745; margin: 0;">Save</button>
+                        <button onclick="cancelCategory()" style="background-color: #6c757d; margin: 0;">Cancel</button>
+                    </div>
+                </div>
+
+                <button onclick="addTransaction()" style="margin-top: 15px;">Save Expense</button>
             </div>
 
             <div class="card">
@@ -393,10 +405,66 @@
                 // For each category, create an option with its ID as the value and Name as the text
                 select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
             });
+
+            select.innerHTML += `<option value="create_new" style="font-weight: bold; color: #007bff;">+ Add New Category</option>`;
         } else {
             // IF THE SERVER IS SLEEPING OR LAGGY:
             const select = document.getElementById("category-select");
             select.innerHTML = `<option value="">Waking up server (takes ~50s)...</option>`;
+        }
+    }
+
+    // --- INLINE CATEGORY LOGIC ---
+    function handleCategoryChange(selectElement) {
+        const inlineForm = document.getElementById("inline-category-form");
+        if (selectElement.value === "create_new") {
+            inlineForm.style.display = "block"; // Show the form
+        } else {
+            inlineForm.style.display = "none";  // Hide it if they pick a normal category
+        }
+    }
+
+    function cancelCategory() {
+        document.getElementById("inline-category-form").style.display = "none";
+        document.getElementById("category-select").value = ""; // Reset dropdown
+    }
+
+    async function addCategory() {
+        const name = document.getElementById("new-cat-name").value;
+        const keywords = document.getElementById("new-cat-keywords").value;
+
+        if (!name) {
+            alert("Please provide at least a category name.");
+            return;
+        }
+
+        let token = localStorage.getItem("token");
+        const payload = { name: name, keywords: keywords || "", monthly_limit: null };
+
+        let response = await fetch(`${API_BASE_URL}/transactions/categories`, {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}` 
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            
+            // 1. Hide the form and clear inputs
+            document.getElementById("inline-category-form").style.display = "none";
+            document.getElementById("new-cat-name").value = "";
+            document.getElementById("new-cat-keywords").value = "";
+            
+            // 2. Refresh the dropdown from the database
+            await fetchCategories(); 
+            
+            // 3. Automatically select the newly created category so they can save their expense immediately!
+            document.getElementById("category-select").value = data.category_id;
+        } else {
+            alert("Failed to create category.");
         }
     }
 
