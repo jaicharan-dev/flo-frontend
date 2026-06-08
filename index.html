@@ -420,51 +420,86 @@
     }
 
     async function fetchCategories() {
-        const token = localStorage.getItem("token");
-        // Remember we kept the prefix, so the URL is /transactions/categories
-        const response = await fetch(`${API_BASE_URL}/transactions/categories`, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-        
-        if (response.ok) {
-            const categories = await response.json();
-            const select = document.getElementById("category-select");
-            select.innerHTML = ""; // Clear the "Loading categories..." text
-            
-            categories.forEach(cat => {
-                // For each category, create an option with its ID as the value and Name as the text
-                select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+        let token = localStorage.getItem("token");
+        if (!token) return;
+
+        try {
+            let response = await fetch(`${API_BASE_URL}/transactions/categories`, {
+                headers: { "Authorization": `Bearer ${token}` }
             });
 
-            select.innerHTML += `<option value="create_new" style="font-weight: bold; color: #007bff;">+ Add New Category</option>`;
-        } else {
-            // IF THE SERVER IS SLEEPING OR LAGGY:
-            const select = document.getElementById("category-select");
-            select.innerHTML = `<option value="">Waking up server (takes ~50s)...</option>`;
+            // Handle token refresh safely
+            if (response.status === 401) {
+                const refreshSuccess = await refreshAccessToken();
+                if (refreshSuccess) {
+                    token = localStorage.getItem("token");
+                    response = await fetch(`${API_BASE_URL}/transactions/categories`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+                } else {
+                    return; // Let the main fetchTransactions handle the logout alert
+                }
+            }
+
+            if (response.ok) {
+                const categories = await response.json();
+                const select = document.getElementById("category-select");
+
+                // 1. ALWAYS start with the default placeholder
+                let optionsHTML = '<option value="">Select a category...</option>';
+
+                // 2. Loop through the database categories and add them
+                categories.forEach(c => {
+                    optionsHTML += `<option value="${c.id}">${c.name}</option>`;
+                });
+
+                // 3. Add the "Create New" option at the absolute bottom
+                optionsHTML += `<option value="create_new" style="font-weight: bold; color: #007bff;">+ Add New Category</option>`;
+
+                // 4. Inject the completely built list into the dropdown
+                select.innerHTML = optionsHTML;
+            }
+        } catch (error) {
+            console.error("Critical error fetching categories:", error);
         }
     }
-
+    
     // --- INLINE CATEGORY LOGIC ---
     // --- CATEGORY UI LOGIC ---
+    // --- CATEGORY UI LOGIC (WITH DIAGNOSTICS) ---
     function handleCategoryChange(selectElement) {
+        console.log("1. Dropdown changed! Selected value:", selectElement.value);
+
         const createForm = document.getElementById("inline-category-form");
         const editLink = document.getElementById("edit-cat-link-container");
         const editBox = document.getElementById("edit-category-box");
 
-        // 1. Reset everything to hidden first
+        // Safety Check: Did we accidentally delete or rename one of the HTML boxes?
+        if (!createForm || !editLink || !editBox) {
+            console.error("UI CRASH: I cannot find one of the HTML boxes!");
+            console.log("Does createForm exist?", !!createForm);
+            console.log("Does editLink exist?", !!editLink);
+            console.log("Does editBox exist?", !!editBox);
+            alert("UI Error: Check the console. An HTML ID is missing.");
+            return; 
+        }
+
+        console.log("2. All HTML elements found. Toggling visibility...");
+
+        // Reset everything to hidden first
         createForm.style.display = "none";
         editBox.style.display = "none";
         editLink.style.display = "none";
 
-        // 2. Decide what to show based on the dropdown choice
+        // Decide what to show
         if (selectElement.value === "create_new") {
+            console.log("3. Opening Create Form!");
             createForm.style.display = "block";
         } else if (selectElement.value !== "") {
-            // It's a real category! Show the edit link.
+            console.log("3. Showing Edit Link!");
             editLink.style.display = "block";
         }
     }
-
     // --- EDIT / DELETE TOGGLES ---
     function openEditCategory() {
         document.getElementById("edit-cat-link-container").style.display = "none";
@@ -488,29 +523,24 @@
         document.getElementById("edit-cat-link-container").style.display = "block";
     }
 
-    // Placeholder functions for the next step!
-    async function saveCategoryEdit() { alert("Ready to connect to API!"); }
-    async function confirmDeleteCategory() { alert("Ready to connect to API!"); }
+    // --- 1. SAVE THE EDITED CATEGORY ---
+    async function saveCategoryEdit() {
+        const select = document.getElementById("category-select");
+        const categoryId = select.value; // The ID is secretly stored in the dropdown value!
+        
+        const newName = document.getElementById("edit-cat-name").value;
+        const newKeywords = document.getElementById("edit-cat-keywords").value;
 
-    function cancelCategory() {
-        document.getElementById("inline-category-form").style.display = "none";
-        document.getElementById("category-select").value = ""; // Reset dropdown
-    }
-
-    async function addCategory() {
-        const name = document.getElementById("new-cat-name").value;
-        const keywords = document.getElementById("new-cat-keywords").value;
-
-        if (!name) {
-            alert("Please provide at least a category name.");
+        if (!newName) {
+            alert("Category name cannot be empty.");
             return;
         }
 
         let token = localStorage.getItem("token");
-        const payload = { name: name, keywords: keywords || "", monthly_limit: null };
+        const payload = { name: newName, keywords: newKeywords || "", monthly_limit: null };
 
-        let response = await fetch(`${API_BASE_URL}/transactions/categories`, {
-            method: "POST",
+        let response = await fetch(`${API_BASE_URL}/transactions/categories/${categoryId}`, {
+            method: "PUT",
             headers: { 
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}` 
@@ -518,21 +548,160 @@
             body: JSON.stringify(payload)
         });
 
+        // The Silent Token Refresh Trap
+        if (response.status === 401) {
+            const refreshSuccess = await refreshAccessToken();
+            if (refreshSuccess) {
+                token = localStorage.getItem("token");
+                response = await fetch(`${API_BASE_URL}/transactions/categories/${categoryId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                localStorage.removeItem("token"); localStorage.removeItem("refresh_token");
+                alert("Session expired. Please log in again."); window.location.reload(); return;
+            }
+        }
+
         if (response.ok) {
-            const data = await response.json();
+            cancelCategoryEdit(); // Hide the edit box
+            await fetchCategories(); // Refresh the dropdown list from the database
+            document.getElementById("category-select").value = categoryId; // Re-select the newly named category
             
-            // 1. Hide the form and clear inputs
-            document.getElementById("inline-category-form").style.display = "none";
-            document.getElementById("new-cat-name").value = "";
-            document.getElementById("new-cat-keywords").value = "";
-            
-            // 2. Refresh the dropdown from the database
-            await fetchCategories(); 
-            
-            // 3. Automatically select the newly created category so they can save their expense immediately!
-            document.getElementById("category-select").value = data.category_id;
+            // If they are on the home screen, refresh the recent list so the new name appears immediately!
+            fetchTransactions(); 
         } else {
-            alert("Failed to create category.");
+            alert("Failed to update category.");
+        }
+    }
+
+    // --- 2. EXECUTE THE DELETE (WITH CRASH LOGGING) ---
+    async function confirmDeleteCategory() {
+        console.log("1. Delete button clicked!"); 
+        
+        try {
+            const select = document.getElementById("category-select");
+            const categoryId = select.value;
+            console.log("2. Attempting to delete Category ID:", categoryId);
+
+            let token = localStorage.getItem("token");
+
+            let response = await fetch(`${API_BASE_URL}/transactions/categories/${categoryId}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+
+            // The Silent Token Refresh Trap
+            if (response.status === 401) {
+                console.log("3. Token expired. Attempting refresh...");
+                const refreshSuccess = await refreshAccessToken();
+                if (refreshSuccess) {
+                    token = localStorage.getItem("token");
+                    response = await fetch(`${API_BASE_URL}/transactions/categories/${categoryId}`, {
+                        method: "DELETE",
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+                } else {
+                    localStorage.removeItem("token"); localStorage.removeItem("refresh_token");
+                    alert("Session expired. Please log in again."); window.location.reload(); return;
+                }
+            }
+
+            if (response.ok) {
+                console.log("4. Backend confirmed deletion! Updating UI...");
+                cancelCategoryEdit(); // Hide the UI
+                document.getElementById("category-select").value = ""; // Reset dropdown to default
+                await fetchCategories(); // Refresh the dropdown
+                fetchTransactions(); // Refresh recent list
+            } else {
+                // If the backend threw a 500 or 404 error
+                const errorData = await response.json();
+                console.error("Backend Error Data:", errorData);
+                alert("Backend refused the delete: " + (errorData.detail || "Check console"));
+            }
+
+        } catch (error) {
+            // If the browser crashed before the fetch could even finish (CORS, network drop, etc)
+            console.error("Critical JS or Network Crash:", error);
+            alert("App crashed! Check the developer console: " + error.message);
+        }
+    }
+
+    function cancelCategory() {
+        document.getElementById("inline-category-form").style.display = "none";
+        document.getElementById("category-select").value = ""; // Reset dropdown
+    }
+
+    // --- CREATE NEW CATEGORY (WITH CRASH LOGGING) ---
+    async function addCategory() {
+        console.log("1. Add Category Save button clicked!");
+        
+        try {
+            const name = document.getElementById("new-cat-name").value;
+            const keywords = document.getElementById("new-cat-keywords").value;
+
+            if (!name) {
+                alert("Please provide at least a category name.");
+                return;
+            }
+
+            let token = localStorage.getItem("token");
+            const payload = { name: name, keywords: keywords || "", monthly_limit: null };
+            console.log("2. Sending payload to backend:", payload);
+
+            let response = await fetch(`${API_BASE_URL}/transactions/categories`, {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` 
+                },
+                body: JSON.stringify(payload)
+            });
+
+            // The Silent Token Refresh Trap
+            if (response.status === 401) {
+                console.log("3. Token expired. Attempting refresh...");
+                const refreshSuccess = await refreshAccessToken();
+                if (refreshSuccess) {
+                    token = localStorage.getItem("token");
+                    response = await fetch(`${API_BASE_URL}/transactions/categories`, {
+                        method: "POST",
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}` 
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    localStorage.removeItem("token"); localStorage.removeItem("refresh_token");
+                    alert("Session expired. Please log in again."); window.location.reload(); return;
+                }
+            }
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log("4. Backend confirmed creation! New ID:", data.category_id);
+                
+                // Hide form and clear inputs
+                document.getElementById("inline-category-form").style.display = "none";
+                document.getElementById("new-cat-name").value = "";
+                document.getElementById("new-cat-keywords").value = "";
+                
+                // Refresh dropdown and auto-select
+                await fetchCategories(); 
+                document.getElementById("category-select").value = data.category_id;
+            } else {
+                // If the backend threw a 500 or 422 error
+                const errorData = await response.json();
+                console.error("Backend Error Data:", errorData);
+                alert("Backend refused the creation: " + (errorData.detail || JSON.stringify(errorData)));
+            }
+
+        } catch (error) {
+            // If the browser crashed before the fetch could even finish
+            console.error("Critical JS or Network Crash:", error);
+            alert("App crashed! Check the developer console: " + error.message);
         }
     }
 
