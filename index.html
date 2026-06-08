@@ -84,22 +84,52 @@
                 <h3>Add Expense</h3>
                 <input type="number" id="amount" placeholder="Amount (₹)">
                 <input type="text" id="desc" placeholder="What did you buy?">
-                
+                     
                 <select id="category-select" onchange="handleCategoryChange(this)">
                     <option value="">Select a category...</option>
                 </select>
 
+                <div id="edit-cat-link-container" style="display: none; text-align: right; margin-top: 5px;">
+                    <span onclick="openEditCategory()" style="color: #007bff; font-size: 12px; cursor: pointer;">✏️ Edit Category</span>
+                </div>
+
                 <div id="inline-category-form" style="display: none; margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px dashed #ccc;">
                     <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #333;">Create Category</h4>
-                    <input type="text" id="new-cat-name" placeholder="Category Name (e.g. Subscriptions)">
+                    <input type="text" id="new-cat-name" placeholder="Category Name">
                     <input type="text" id="new-cat-keywords" placeholder="Keywords (optional)">
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
-                        <button onclick="addCategory()" style="background-color: #28a745; margin: 0;">Save</button>
-                        <button onclick="cancelCategory()" style="background-color: #6c757d; margin: 0;">Cancel</button>
+                        <button onclick="addCategory()" style="background-color: #28a745; margin: 0; flex: 1;">Save</button>
+                        <button onclick="cancelCategory()" style="background-color: #6c757d; margin: 0; flex: 1;">Cancel</button>
                     </div>
                 </div>
 
+                <div id="edit-category-box" style="display: none; margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ccc;">
+                    
+                    <div id="edit-cat-inputs">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #333;">Edit Category</h4>
+                        <input type="text" id="edit-cat-name" placeholder="New Name">
+                        <input type="text" id="edit-cat-keywords" placeholder="New Keywords">
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button onclick="saveCategoryEdit()" style="background-color: #28a745; margin: 0; flex: 1;">Save</button>
+                            <button onclick="showDeleteWarning()" style="background-color: #dc3545; margin: 0; flex: 1;">🗑️ Delete</button>
+                        </div>
+                        <button onclick="cancelCategoryEdit()" style="background-color: #6c757d; margin: 0; width: 100%; margin-top: 10px;">Cancel</button>
+                    </div>
+
+                    <div id="delete-warning-box" style="display: none; background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; border-radius: 5px;">
+                        <p style="margin: 0 0 10px 0; color: #856404; font-size: 13px;">
+                            <strong>⚠️ Warning:</strong> Deleting is permanent. Past expenses will be kept, but marked as "Uncategorized".
+                        </p>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="confirmDeleteCategory()" style="background-color: #dc3545; margin: 0; flex: 1; font-weight: bold;">Yes, Delete</button>
+                            <button onclick="cancelCategoryEdit()" style="background-color: #6c757d; margin: 0; flex: 1;">Cancel</button>
+                        </div>
+                    </div>
+
+                </div>
+
                 <button onclick="addTransaction()" style="margin-top: 15px;">Save Expense</button>
+
             </div>
 
             <div class="card">
@@ -415,14 +445,52 @@
     }
 
     // --- INLINE CATEGORY LOGIC ---
+    // --- CATEGORY UI LOGIC ---
     function handleCategoryChange(selectElement) {
-        const inlineForm = document.getElementById("inline-category-form");
+        const createForm = document.getElementById("inline-category-form");
+        const editLink = document.getElementById("edit-cat-link-container");
+        const editBox = document.getElementById("edit-category-box");
+
+        // 1. Reset everything to hidden first
+        createForm.style.display = "none";
+        editBox.style.display = "none";
+        editLink.style.display = "none";
+
+        // 2. Decide what to show based on the dropdown choice
         if (selectElement.value === "create_new") {
-            inlineForm.style.display = "block"; // Show the form
-        } else {
-            inlineForm.style.display = "none";  // Hide it if they pick a normal category
+            createForm.style.display = "block";
+        } else if (selectElement.value !== "") {
+            // It's a real category! Show the edit link.
+            editLink.style.display = "block";
         }
     }
+
+    // --- EDIT / DELETE TOGGLES ---
+    function openEditCategory() {
+        document.getElementById("edit-cat-link-container").style.display = "none";
+        document.getElementById("edit-category-box").style.display = "block";
+        document.getElementById("edit-cat-inputs").style.display = "block";
+        document.getElementById("delete-warning-box").style.display = "none";
+        
+        // Grab the current name from the dropdown to pre-fill the input
+        const select = document.getElementById("category-select");
+        const currentName = select.options[select.selectedIndex].text;
+        document.getElementById("edit-cat-name").value = currentName;
+    }
+
+    function showDeleteWarning() {
+        document.getElementById("edit-cat-inputs").style.display = "none";
+        document.getElementById("delete-warning-box").style.display = "block";
+    }
+
+    function cancelCategoryEdit() {
+        document.getElementById("edit-category-box").style.display = "none";
+        document.getElementById("edit-cat-link-container").style.display = "block";
+    }
+
+    // Placeholder functions for the next step!
+    async function saveCategoryEdit() { alert("Ready to connect to API!"); }
+    async function confirmDeleteCategory() { alert("Ready to connect to API!"); }
 
     function cancelCategory() {
         document.getElementById("inline-category-form").style.display = "none";
