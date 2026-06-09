@@ -73,12 +73,14 @@
             <button class="nav-btn active" onclick="switchTab('home')">Home</button>
         </div>
 
+
         <div id="home" class="tab-content active">
             
-            <div class="card" style="text-align: center;">
-                <h1 id="total-spent">₹0.00</h1>
-                <p style="margin:0; color: gray;">Spent in last 90 days</p>
+            <div class="card" style="text-align: center; padding: 30px 15px; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 42px; color: #212529;" id="weekly-total">₹0.00</h2>
+                <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 15px;">Spent this week</p>
             </div>
+            
 
             <div class="card">
                 <h3>Add Expense</h3>
@@ -243,7 +245,7 @@
         let token = localStorage.getItem("token");
         if (!token) return;
 
-        let response = await fetch(`${API_BASE_URL}/transactions/?skip=0&limit=50`, {
+        let response = await fetch(`${API_BASE_URL}/transactions/?skip=0&limit=200`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
 
@@ -268,20 +270,39 @@
             const list = document.getElementById("transaction-list");
             list.innerHTML = "";
 
-            // 1. Get exact local date in YYYY-MM-DD format (India Standard Time safe)
-            const todayStr = new Date().toLocaleDateString('en-CA'); 
+            // 1. Get exact local dates (Timezone safe)
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('en-CA'); 
 
-            // 2. Filter the list to ONLY include today's transactions
+            // 2. Calculate the date of this past Monday
+            const dayOfWeek = now.getDay(); // Sunday is 0, Monday is 1, etc.
+            const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - daysSinceMonday);
+            const mondayStr = monday.toLocaleDateString('en-CA');
+
+            // 3. Filter and Calculate
+            let dailyTotal = 0;
+            let weeklyTotal = 0;
+
+            // Calculate weekly total by checking if the date falls between Monday and Today
+            transactions.forEach(t => {
+                if (t.transaction_date >= mondayStr && t.transaction_date <= todayStr) {
+                    weeklyTotal += t.amount;
+                }
+            });
+
+            // Filter the list for the UI to ONLY show today's items
             const todaysTransactions = transactions.filter(t => t.transaction_date === todayStr);
 
-            // 3. Keep a running total
-            let dailyTotal = 0;
-
+            // 4. Build Today's HTML List
             if (todaysTransactions.length === 0) {
                 list.innerHTML = "<p style='text-align: center; color: gray; font-style: italic;'>No expenses logged today. Great job!</p>";
             } else {
                 todaysTransactions.forEach(t => {
-                    dailyTotal += t.amount; // Add to our total
+                    dailyTotal += t.amount; // Add to our daily total
+                    
+                    const catName = categoryMap[t.category_id] || 'Uncategorized';
                     
                     const li = document.createElement("li");
                     li.style.display = "flex";
@@ -289,9 +310,6 @@
                     li.style.padding = "10px 0";
                     li.style.borderBottom = "1px solid #eee";
                     
-                    // Look up the name in our map, or default to Uncategorized
-                    const catName = categoryMap[t.category_id] || 'Uncategorized';
-
                     li.innerHTML = `
                         <div>
                             <strong>${t.description}</strong><br>
@@ -305,7 +323,8 @@
                 });
             }
 
-            // 4. Update the shiny new badge at the top!
+            // 5. Update BOTH badges!
+            document.getElementById("weekly-total").innerText = `₹${weeklyTotal.toFixed(2)}`;
             document.getElementById("daily-total").innerText = `₹${dailyTotal.toFixed(2)}`;
         }
     }
