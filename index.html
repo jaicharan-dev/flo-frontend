@@ -97,12 +97,11 @@
                 <p style="margin: 5px 0 0 0; color: #6c757d; font-size: 15px;">Spent this week</p>
             </div>
             
-
             <div class="card">
                 <h3>Add Expense</h3>
-                <input type="number" id="amount" placeholder="Amount (₹)">
-                <input type="text" id="desc" placeholder="What did you buy?">
-                     
+                <input type="number" id="amount" autocomplete="off" placeholder="Amount (₹)">
+                <input type="text" id="desc" autocomplete="off" placeholder="What did you buy?">
+                      
                 <select id="category-select" onchange="handleCategoryChange(this)">
                     <option value="">Select a category...</option>
                 </select>
@@ -113,8 +112,8 @@
 
                 <div id="inline-category-form" style="display: none; margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px dashed #ccc;">
                     <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #333;">Create Category</h4>
-                    <input type="text" id="new-cat-name" placeholder="Category Name">
-                    <input type="text" id="new-cat-keywords" placeholder="Keywords (optional)">
+                    <input type="text" id="new-cat-name" autocomplete="off" placeholder="Category Name">
+                    <input type="text" id="new-cat-keywords" autocomplete="off" placeholder="Keywords (optional)">
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <button onclick="addCategory()" style="background-color: #28a745; margin: 0; flex: 1;">Save</button>
                         <button onclick="cancelCategory()" style="background-color: #6c757d; margin: 0; flex: 1;">Cancel</button>
@@ -125,8 +124,8 @@
                     
                     <div id="edit-cat-inputs">
                         <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #333;">Edit Category</h4>
-                        <input type="text" id="edit-cat-name" placeholder="New Name">
-                        <input type="text" id="edit-cat-keywords" placeholder="New Keywords">
+                        <input type="text" id="edit-cat-name" autocomplete="off" placeholder="New Name">
+                        <input type="text" id="edit-cat-keywords" autocomplete="off" placeholder="New Keywords">
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
                             <button onclick="saveCategoryEdit()" style="background-color: #28a745; margin: 0; flex: 1;">Save</button>
                             <button onclick="showDeleteWarning()" style="background-color: #dc3545; margin: 0; flex: 1;">🗑️ Delete</button>
@@ -195,16 +194,16 @@
         <input type="hidden" id="edit-tx-id">
 
         <label style="font-size: 12px; color: gray;">Amount (₹)</label>
-        <input type="number" id="edit-tx-amount" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+        <input type="number" id="edit-tx-amount" autocomplete="off" style="width: 100%; margin-bottom: 10px; padding: 8px;">
 
         <label style="font-size: 12px; color: gray;">Description</label>
-        <input type="text" id="edit-tx-desc" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+        <input type="text" id="edit-tx-desc" autocomplete="off" style="width: 100%; margin-bottom: 10px; padding: 8px;">
 
         <label style="font-size: 12px; color: gray;">Date</label>
-        <input type="date" id="edit-tx-date" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+        <input type="date" id="edit-tx-date" autocomplete="off" style="width: 100%; margin-bottom: 10px; padding: 8px;">
 
         <label style="font-size: 12px; color: gray;">Category</label>
-        <select id="edit-tx-category" style="width: 100%; margin-bottom: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
+        <select id="edit-tx-category" autocomplete="off" style="width: 100%; margin-bottom: 20px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;">
             </select>
 
         <div id="tx-edit-buttons" style="display: flex; gap: 10px;">
@@ -325,6 +324,9 @@
             const data = await response.json();
             localStorage.setItem("token", data.access_token); // Save the Visitor Badge
             localStorage.setItem("refresh_token", data.refresh_token); // Save the Vault Key
+            // Wipe the inputs so Chrome stops snooping!
+            document.getElementById("email").value = ""; 
+            document.getElementById("password").value = "";
             showApp();
         } else {
             alert("Login failed! Check credentials.");
