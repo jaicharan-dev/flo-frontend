@@ -57,11 +57,27 @@
 <div class="container">
     
     <div id="login-screen" class="card">
-        <h2>Welcome to Flo</h2>
-        <input type="email" id="email" placeholder="Email Address">
-        <input type="password" id="password" placeholder="Password">
-        <button onclick="login()">Log In</button>
-        <p style="font-size: 12px; text-align: center; color: gray;">(Ensure your backend is running!)</p>
+        
+        <div id="login-form">
+            <h2>Welcome to Flo</h2>
+            <input type="email" id="email" placeholder="Email Address">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="login()">Log In</button>
+            <p style="font-size: 13px; text-align: center; margin-top: 15px;">
+                New to Flo? <a href="#" onclick="toggleAuth('register')" style="color: #007bff; text-decoration: none;">Create an account</a>
+            </p>
+        </div>
+
+        <div id="register-form" style="display: none;">
+            <h2>Join Flo</h2>
+            <input type="email" id="reg-email" placeholder="Email Address">
+            <input type="password" id="reg-password" placeholder="Password">
+            <button onclick="registerUser()" style="background-color: #28a745;">Sign Up</button>
+            <p style="font-size: 13px; text-align: center; margin-top: 15px;">
+                Already have an account? <a href="#" onclick="toggleAuth('login')" style="color: #007bff; text-decoration: none;">Log in here</a>
+            </p>
+        </div>
+
     </div>
 
     <div id="app-screen" class="hidden">
@@ -226,6 +242,17 @@
     
     let categoryMap = {}; // Cheat sheet for category IDs to Names
 
+    // --- AUTHENTICATION UI TOGGLE ---
+    function toggleAuth(view) {
+        if (view === 'register') {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+        } else {
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
+        }
+    }
+
     // --- APP LOGIC ---
     // Check if we are already logged in when the app opens
     window.onload = () => {
@@ -233,6 +260,51 @@
             showApp();
         }
     };
+
+    // --- USER REGISTRATION LOGIC ---
+    async function registerUser() {
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+
+        // 1. Basic Validation
+        if (!email || !password) {
+            alert("Please fill in both an email and a password.");
+            return;
+        }
+
+        try {
+            // 2. Send the data to your backend
+            // NOTE: You might need to change '/users/' to match your exact backend route!
+            const response = await fetch(`${API_BASE_URL}/auth/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email: email, password: password })
+            });
+
+            // 3. Handle the response
+            if (response.ok) {
+                alert("Account created successfully! Please log in.");
+                
+                // Flip the UI back to the login screen automatically
+                toggleAuth('login');
+                
+                // UX trick: Auto-fill the email they just used so they don't have to type it twice
+                document.getElementById('email').value = email;
+                document.getElementById('password').value = ""; // clear password field
+                document.getElementById('reg-password').value = ""; 
+                
+            } else {
+                // If the backend rejects it (e.g., email already exists)
+                const errorData = await response.json();
+                alert("Registration failed: " + (errorData.detail || JSON.stringify(errorData)));
+            }
+        } catch (error) {
+            console.error("Registration crash:", error);
+            alert("Network error. Make sure your Python backend is running!");
+        }
+    }
 
     async function login() {
         const email = document.getElementById("email").value;
