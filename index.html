@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Flo Tracker</title>
+    <style>
         :root {
             --primary: #007AFF;
             --primary-bg: #F2F2F7;
@@ -22,7 +23,7 @@
         input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ccc; box-sizing: border-box; font-size: 15px; }
         button { background-color: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
         button:active { opacity: 0.8; }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
         .transaction-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
         
         /* Navigation Bar */
@@ -240,6 +241,7 @@
             padding: 16px 10px;
             font-size: 13px;
         }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
